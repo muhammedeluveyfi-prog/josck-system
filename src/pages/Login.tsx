@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, UserRole } from '../types';
+import { User } from '../types';
 import { storage } from '../utils/storage';
-import { LogIn, AlertCircle, Smartphone, CircuitBoard, Wrench, Shield, User as UserIcon, UserPlus, X } from 'lucide-react';
+import { apiService } from '../services/apiService';
+import { LogIn, AlertCircle, Smartphone, CircuitBoard, Wrench, Shield, User as UserIcon } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -12,70 +13,64 @@ export default function Login({ onLogin }: LoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showSignup, setShowSignup] = useState(false);
-  const [signupData, setSignupData] = useState({
-    name: '',
-    username: '',
-    password: '',
-    confirmPassword: '',
-    role: 'operations' as UserRole,
-  });
-  const [signupError, setSignupError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Clear any existing error when component mounts
+  useEffect(() => {
+    setError('');
+    // Clear any invalid tokens
+    const token = localStorage.getItem('josck_auth_token');
+    if (token) {
+      // Token exists, but if we're on login page, it might be invalid
+      // We'll let the login attempt verify it
+    }
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    const users = storage.getUsers();
-    const user = users.find(
-      u => u.username === username && u.password === password
-    );
+    try {
+      // Validate inputs
+      if (!username.trim() || !password.trim()) {
+        setError('يرجى إدخال اسم المستخدم وكلمة المرور');
+        setLoading(false);
+        return;
+      }
 
-    if (user) {
-      onLogin(user);
-      navigate(`/${user.role}`);
-    } else {
-      setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+      // Use Backend API for login
+      const response = await apiService.login(username.trim(), password);
+      
+      if (response.token && response.user) {
+        // Save user to localStorage
+        storage.setCurrentUser(response.user);
+        onLogin(response.user);
+        navigate(`/${response.user.role}`);
+      } else {
+        setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+        setLoading(false);
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
+      
+      if (error?.message) {
+        if (error.message.includes('Invalid username or password')) {
+          errorMessage = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+          errorMessage = 'لا يمكن الاتصال بالسيرفر. تأكد من أن السيرفر يعمل على http://localhost:3000';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
+      setLoading(false);
     }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSignupError('');
-
-    if (signupData.password !== signupData.confirmPassword) {
-      setSignupError('كلمة المرور غير متطابقة');
-      return;
-    }
-
-    if (signupData.password.length < 4) {
-      setSignupError('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
-      return;
-    }
-
-    const users = storage.getUsers();
-    if (users.some(u => u.username === signupData.username)) {
-      setSignupError('اسم المستخدم موجود بالفعل');
-      return;
-    }
-
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: signupData.name,
-      username: signupData.username,
-      password: signupData.password,
-      role: signupData.role,
-      createdAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    storage.saveUsers(users);
-    
-    // تسجيل الدخول تلقائياً بعد إنشاء الحساب
-    onLogin(newUser);
-    navigate(`/${newUser.role}`);
-  };
 
   return (
     <div style={{
@@ -313,223 +308,37 @@ export default function Login({ onLogin }: LoginProps) {
           <button 
             type="submit" 
             className="btn btn-primary" 
+            disabled={loading}
             style={{ 
               width: '100%',
               padding: '1rem',
               fontSize: '1rem',
               fontWeight: 600,
-              background: 'linear-gradient(135deg, #002147 0%, #003366 100%)',
+              background: loading ? '#94a3b8' : 'linear-gradient(135deg, #002147 0%, #003366 100%)',
               border: 'none',
               boxShadow: '0 4px 15px rgba(0, 33, 71, 0.4)',
               transition: 'all 0.3s',
-              marginTop: '1rem'
+              marginTop: '1rem',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 33, 71, 0.5)';
+              if (!loading) {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 33, 71, 0.5)';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 33, 71, 0.4)';
+              if (!loading) {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 33, 71, 0.4)';
+              }
             }}
           >
             <LogIn size={20} style={{ marginLeft: '0.5rem' }} />
-            تسجيل الدخول
+            {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
           </button>
         </form>
-
-        {/* Divider */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          margin: '1.5rem 0',
-          gap: '1rem'
-        }}>
-          <div style={{ flex: 1, height: '1px', background: '#e9ecef' }}></div>
-          <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>أو</span>
-          <div style={{ flex: 1, height: '1px', background: '#e9ecef' }}></div>
-        </div>
-
-        {/* Signup Button */}
-        {!showSignup && (
-          <button 
-            type="button"
-            onClick={() => setShowSignup(true)}
-            className="btn btn-accent" 
-            style={{ 
-              width: '100%',
-              padding: '1rem',
-              fontSize: '1rem',
-              fontWeight: 600,
-              background: '#C7B58D',
-              color: '#002147',
-              border: '2px solid #C7B58D',
-              transition: 'all 0.3s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(199, 181, 141, 0.3)';
-              e.currentTarget.style.background = '#d4c4a0';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-              e.currentTarget.style.background = '#C7B58D';
-            }}
-          >
-            <UserPlus size={20} style={{ marginLeft: '0.5rem' }} />
-            إنشاء حساب جديد
-          </button>
-        )}
-
-        {/* Signup Form */}
-        {showSignup && (
-          <div style={{
-            marginTop: '1.5rem',
-            padding: '1.5rem',
-            background: 'rgba(199, 181, 141, 0.05)',
-            borderRadius: '0.75rem',
-            border: '2px solid rgba(199, 181, 141, 0.3)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h3 style={{ 
-                fontSize: '1.125rem', 
-                fontWeight: 700, 
-                color: '#002147',
-                margin: 0
-              }}>
-                إنشاء حساب جديد
-              </h3>
-              <button
-                onClick={() => {
-                  setShowSignup(false);
-                  setSignupError('');
-                  setSignupData({
-                    name: '',
-                    username: '',
-                    password: '',
-                    confirmPassword: '',
-                    role: 'operations',
-                  });
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#6c757d',
-                  padding: '0.25rem'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSignup}>
-              {signupError && (
-                <div style={{
-                  padding: '0.875rem',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  color: '#ef4444',
-                  borderRadius: '0.5rem',
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  border: '1px solid rgba(239, 68, 68, 0.2)'
-                }}>
-                  <AlertCircle size={18} />
-                  {signupError}
-                </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">الاسم الكامل *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={signupData.name}
-                  onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
-                  required
-                  placeholder="أدخل الاسم الكامل"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">اسم المستخدم *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={signupData.username}
-                  onChange={(e) => setSignupData({ ...signupData, username: e.target.value })}
-                  required
-                  placeholder="أدخل اسم المستخدم"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">كلمة المرور *</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  value={signupData.password}
-                  onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                  required
-                  minLength={4}
-                  placeholder="أدخل كلمة المرور (4 أحرف على الأقل)"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">تأكيد كلمة المرور *</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  value={signupData.confirmPassword}
-                  onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                  required
-                  placeholder="أعد إدخال كلمة المرور"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">نوع المستخدم *</label>
-                <select
-                  className="form-select"
-                  value={signupData.role}
-                  onChange={(e) => setSignupData({ ...signupData, role: e.target.value as UserRole })}
-                  required
-                >
-                  <option value="operations">موظف العمليات</option>
-                  <option value="technician">فني</option>
-                  <option value="customer_service">خدمة العملاء</option>
-                </select>
-              </div>
-
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
-                style={{ 
-                  width: '100%',
-                  padding: '0.875rem',
-                  fontSize: '0.9375rem',
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #002147 0%, #003366 100%)',
-                  border: 'none',
-                  marginTop: '0.5rem'
-                }}
-              >
-                <UserPlus size={18} style={{ marginLeft: '0.5rem' }} />
-                إنشاء الحساب
-              </button>
-            </form>
-          </div>
-        )}
 
         <div style={{ 
           marginTop: '2rem', 

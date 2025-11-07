@@ -13,12 +13,17 @@ interface TransferBackModalProps {
 export default function TransferBackModal({ device, technician, onClose, onSuccess }: TransferBackModalProps) {
   const [report, setReport] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Add report
-    if (report.trim()) {
-      storage.addReport(device.id, {
+    if (!report.trim()) {
+      alert('يرجى كتابة تقرير الفني قبل التحويل');
+      return;
+    }
+
+    try {
+      // Add report
+      await storage.addReport(device.id, {
         id: Date.now().toString(),
         deviceId: device.id,
         content: report,
@@ -27,17 +32,20 @@ export default function TransferBackModal({ device, technician, onClose, onSucce
         authorRole: 'technician',
         createdAt: new Date().toISOString(),
       });
+
+      // Transfer back to operations
+      await storage.updateDevice(device.id, {
+        status: 'received_from_technician',
+        location: 'operations',
+        technicianId: undefined,
+        technicianName: undefined,
+      });
+
+      onSuccess();
+    } catch (error) {
+      console.error('Error transferring device back:', error);
+      alert('حدث خطأ أثناء تحويل الجهاز');
     }
-
-    // Transfer back to operations
-    storage.updateDevice(device.id, {
-      status: 'received_from_technician',
-      location: 'operations',
-      technicianId: undefined,
-      technicianName: undefined,
-    });
-
-    onSuccess();
   };
 
   return (
@@ -61,13 +69,33 @@ export default function TransferBackModal({ device, technician, onClose, onSucce
             </div>
 
             <div className="form-group">
-              <label className="form-label">تقرير الفني (اختياري)</label>
+              <label className="form-label" style={{ 
+                fontWeight: 600,
+                color: '#002147',
+                fontSize: '0.9375rem',
+                marginBottom: '0.75rem'
+              }}>
+                تقرير الفني *
+              </label>
+              <p style={{ 
+                fontSize: '0.8125rem', 
+                color: '#6c757d', 
+                marginBottom: '0.75rem',
+                marginTop: '-0.5rem'
+              }}>
+                يرجى كتابة تقرير عن حالة الجهاز والتصليحات التي تمت قبل التحويل
+              </p>
               <textarea
                 className="form-textarea"
                 value={report}
                 onChange={(e) => setReport(e.target.value)}
-                placeholder="أدخل تقرير الفني..."
-                rows={5}
+                placeholder="أدخل تقرير الفني... (مثال: تم إصلاح الشاشة واستبدال البطارية، الجهاز يعمل بشكل طبيعي)"
+                required
+                rows={6}
+                style={{
+                  border: '2px solid #e9ecef',
+                  fontSize: '0.9375rem'
+                }}
               />
             </div>
           </div>

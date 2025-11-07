@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { Device } from '../../types';
+import { Device, User } from '../../types';
 import { storage } from '../../utils/storage';
 
 interface TransferDeviceModalProps {
@@ -13,29 +13,48 @@ export default function TransferDeviceModal({ device, onClose, onSuccess }: Tran
   const [selectedTechnician, setSelectedTechnician] = useState('');
   const [needsApproval, setNeedsApproval] = useState(false);
   const [approvalReason, setApprovalReason] = useState('');
+  const [technicians, setTechnicians] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const technicians = storage.getUsers().filter(u => u.role === 'technician');
+  useEffect(() => {
+    const loadTechnicians = async () => {
+      try {
+        const allUsers = await storage.getUsers();
+        setTechnicians(allUsers.filter(u => u.role === 'technician'));
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading technicians:', error);
+        setLoading(false);
+      }
+    };
+    loadTechnicians();
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (needsApproval) {
-      storage.updateDevice(device.id, {
-        status: 'awaiting_approval',
-        needsApproval: true,
-        approvalReason: approvalReason,
-      });
-    } else if (selectedTechnician) {
-      const technician = technicians.find(t => t.id === selectedTechnician);
-      storage.updateDevice(device.id, {
-        status: 'transferred',
-        location: 'technician',
-        technicianId: selectedTechnician,
-        technicianName: technician?.name,
-      });
-    }
+    try {
+      if (needsApproval) {
+        await storage.updateDevice(device.id, {
+          status: 'awaiting_approval',
+          needsApproval: true,
+          approvalReason: approvalReason,
+        });
+      } else if (selectedTechnician) {
+        const technician = technicians.find(t => t.id === selectedTechnician);
+        await storage.updateDevice(device.id, {
+          status: 'transferred',
+          location: 'technician',
+          technicianId: selectedTechnician,
+          technicianName: technician?.name,
+        });
+      }
 
-    onSuccess();
+      onSuccess();
+    } catch (error) {
+      console.error('Error transferring device:', error);
+      alert('حدث خطأ أثناء تحويل الجهاز');
+    }
   };
 
   return (
@@ -123,5 +142,6 @@ export default function TransferDeviceModal({ device, onClose, onSuccess }: Tran
     </div>
   );
 }
+
 
 

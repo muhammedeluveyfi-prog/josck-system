@@ -26,7 +26,12 @@ export interface Device {
   imei: string;
   phoneNumber?: string;
   faultType: string;
-  expectedDuration: string;
+  expectedDuration: string; // للتوافق مع الكود القديم
+  scheduledStartDate?: string; // تاريخ ووقت الإضافة المحدد من الموظف
+  expectedDurationValue?: number; // القيمة الرقمية للمدة (للتوافق)
+  expectedDurationUnit?: 'hours' | 'days'; // الوحدة: ساعات أو أيام (للتوافق)
+  expectedDurationDays?: number; // عدد الأيام
+  expectedDurationHours?: number; // عدد الساعات
   status: DeviceStatus;
   location: DeviceLocation;
   technicianId?: string;

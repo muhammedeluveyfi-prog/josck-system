@@ -7,15 +7,50 @@ import TechnicianDashboard from './pages/TechnicianDashboard';
 import CustomerServiceDashboard from './pages/CustomerServiceDashboard';
 import { User } from './types';
 import { storage } from './utils/storage';
+import { apiService } from './services/apiService';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const user = storage.getCurrentUser();
-    setCurrentUser(user);
-    setLoading(false);
+    const loadUser = async () => {
+      try {
+        const user = storage.getCurrentUser();
+        const token = localStorage.getItem('josck_auth_token');
+        
+        // Only verify token if both user and token exist
+        if (user && token) {
+          try {
+            await apiService.verifyToken();
+            setCurrentUser(user);
+          } catch (error) {
+            // Token invalid or expired, silently clear user data
+            // Don't show error message - just redirect to login
+            console.log('Token invalid or expired, clearing session');
+            storage.setCurrentUser(null);
+            apiService.logout();
+            setCurrentUser(null);
+          }
+        } else {
+          // No user or token, ensure clean state
+          if (!token && user) {
+            storage.setCurrentUser(null);
+            apiService.logout();
+          }
+          setCurrentUser(null);
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+        // On any error, clear user data
+        storage.setCurrentUser(null);
+        apiService.logout();
+        setCurrentUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUser();
   }, []);
 
   const handleLogin = (user: User) => {
@@ -24,6 +59,7 @@ function App() {
   };
 
   const handleLogout = () => {
+    apiService.logout();
     storage.setCurrentUser(null);
     setCurrentUser(null);
   };
@@ -96,5 +132,6 @@ function App() {
 }
 
 export default App;
+
 
 

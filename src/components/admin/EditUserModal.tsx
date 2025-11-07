@@ -17,22 +17,29 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
     role: user.role,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const users = storage.getUsers();
-    const index = users.findIndex(u => u.id === user.id);
-    
-    if (index !== -1) {
-      users[index] = {
-        ...users[index],
+    try {
+      const { firebaseService } = await import('../../services/firebaseService');
+      const updates: any = {
         name: formData.name,
         role: formData.role,
         username: formData.username,
-        ...(formData.password && { password: formData.password }),
       };
-      storage.saveUsers(users);
-      onSuccess();
+      
+      if (formData.password) {
+        updates.password = formData.password;
+      }
+
+      const success = await firebaseService.updateUser(user.id, updates);
+      if (success) {
+        await storage.refreshUsers();
+        onSuccess();
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('حدث خطأ أثناء تحديث المستخدم');
     }
   };
 
@@ -108,5 +115,6 @@ export default function EditUserModal({ user, onClose, onSuccess }: EditUserModa
     </div>
   );
 }
+
 
 

@@ -5,7 +5,7 @@ import { storage } from '../utils/storage';
 import { format } from 'date-fns';
 import {
   Plus, CheckCircle, User as UserIcon,
-  Search, Edit, Eye, Send, FileText
+  Search, Edit, Eye, Send, FileText, Trash2, ClipboardCheck
 } from 'lucide-react';
 import AddDeviceModal from '../components/operations/AddDeviceModal';
 import EditDeviceModal from '../components/operations/EditDeviceModal';
@@ -29,19 +29,38 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  const [users, setUsers] = useState<User[]>([]);
+
   useEffect(() => {
-    loadDevices();
+    loadData();
   }, []);
 
-  const loadDevices = () => {
-    const allDevices = storage.getDevices();
-    setDevices(allDevices);
+  const loadData = async () => {
+    try {
+      const [allDevices, allUsers] = await Promise.all([
+        storage.getDevices(),
+        storage.getUsers(),
+      ]);
+      setDevices(allDevices);
+      setUsers(allUsers);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+
+  const loadDevices = async () => {
+    try {
+      const allDevices = await storage.getDevices();
+      setDevices(allDevices);
+    } catch (error) {
+      console.error('Error loading devices:', error);
+    }
   };
 
   const getTechnicianStats = (): TechnicianStats[] => {
-    const technicians = storage.getUsers().filter(u => u.role === 'technician');
+    const technicians = users.filter(u => u.role === 'technician');
     return technicians.map(tech => {
-      const techDevices = devices.filter(d => d.technicianId === tech.id && d.status === 'in_repair');
+      const techDevices = devices.filter(d => d.technicianId === tech.id && (d.status === 'in_repair' || d.status === 'transferred'));
       return {
         technicianId: tech.id,
         technicianName: tech.name,
@@ -53,7 +72,7 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
 
   const getStats = () => {
     return {
-      inRepair: devices.filter(d => d.status === 'in_repair').length,
+      inRepair: devices.filter(d => d.status === 'in_repair' || d.status === 'transferred').length,
       completed: devices.filter(d => d.status === 'completed').length,
       transferred: devices.filter(d => d.status === 'transferred').length,
       awaitingApproval: devices.filter(d => d.status === 'awaiting_approval').length,
@@ -102,14 +121,6 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
     setShowCompleteModal(true);
   };
 
-  const handleInspectDevice = (device: Device) => {
-    storage.updateDevice(device.id, {
-      status: 'in_repair',
-      location: 'operations',
-    });
-    loadDevices();
-  };
-
   const handleReceiveFromTechnician = (device: Device) => {
     storage.updateDevice(device.id, {
       status: 'received_from_technician',
@@ -120,71 +131,312 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
     loadDevices();
   };
 
+  const handleDeleteDevice = async (device: Device) => {
+    const deviceName = device.deviceName || device.orderNumber;
+    if (window.confirm(`هل أنت متأكد من حذف الجهاز "${deviceName}"؟\n\nهذه العملية لا يمكن التراجع عنها.`)) {
+      try {
+        const success = await storage.deleteDevice(device.id);
+        if (success) {
+          await loadDevices();
+        } else {
+          alert('حدث خطأ أثناء حذف الجهاز');
+        }
+      } catch (error) {
+        console.error('Error deleting device:', error);
+        alert('حدث خطأ أثناء حذف الجهاز');
+      }
+    }
+  };
+
+  const handleApproveDevice = async (device: Device) => {
+    if (!confirm('هل أنت متأكد من الموافقة على هذا الجهاز؟')) {
+      return;
+    }
+
+    try {
+      await storage.updateDevice(device.id, {
+        status: 'completed',
+        location: 'customer',
+        updatedAt: new Date().toISOString(),
+      });
+      
+      // Reload devices to get updated data
+      await loadDevices();
+      
+      // Scroll to completed devices section
+      setTimeout(() => {
+        const element = document.getElementById('completed-devices');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+      
+      alert('تمت الموافقة على الجهاز بنجاح وتم نقله إلى قسم المكتملة');
+    } catch (error) {
+      console.error('Error approving device:', error);
+      alert('حدث خطأ أثناء الموافقة على الجهاز');
+    }
+  };
+
+  const inRepairDevices = devices.filter(d => d.status === 'in_repair' || d.status === 'transferred');
+  const completedDevices = devices.filter(d => d.status === 'completed');
+  const awaitingApprovalDevices = devices.filter(d => d.status === 'awaiting_approval');
+  const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
+
+  const handleViewTechnicianDevices = (technicianId: string, technicianName: string) => {
+    setSelectedTechnician(technicianId);
+    setFilterStatus('in_repair');
+    setSearchTerm(technicianName);
+    // Scroll to in repair section
+    setTimeout(() => {
+      const element = document.getElementById('in-repair-devices');
+      element?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  // Filter in repair devices by selected technician
+  const filteredInRepairDevices = selectedTechnician 
+    ? inRepairDevices.filter(d => d.technicianId === selectedTechnician)
+    : inRepairDevices;
+
   return (
     <Layout title="واجهة موظف إدارة العمليات" user={user} onLogout={onLogout}>
-      {/* Statistics */}
+      {/* Statistics Cards - Clickable */}
       <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#002147' }}>{stats.inRepair}</div>
-          <div className="stat-label">قيد التصليح</div>
+        <div 
+          className="stat-card" 
+          style={{ 
+            cursor: 'pointer',
+            border: stats.inRepair > 0 ? '2px solid #002147' : '2px solid transparent',
+            background: stats.inRepair > 0 ? 'rgba(0, 33, 71, 0.05)' : 'white',
+            transition: 'all 0.3s'
+          }}
+          onClick={() => {
+            const element = document.getElementById('in-repair-devices');
+            element?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onMouseEnter={(e) => {
+            if (stats.inRepair > 0) {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 33, 71, 0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <div className="stat-value" style={{ color: '#002147', fontSize: '2.5rem' }}>{stats.inRepair}</div>
+          <div className="stat-label" style={{ fontSize: '1rem', fontWeight: 600 }}>قيد التصليح</div>
+          {stats.inRepair > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6c757d' }}>
+              اضغط للدخول
+            </div>
+          )}
         </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#059669' }}>{stats.completed}</div>
-          <div className="stat-label">مكتملة</div>
+        <div 
+          className="stat-card"
+          style={{ 
+            cursor: 'pointer',
+            border: stats.completed > 0 ? '2px solid #059669' : '2px solid transparent',
+            background: stats.completed > 0 ? 'rgba(5, 150, 105, 0.05)' : 'white',
+            transition: 'all 0.3s'
+          }}
+          onClick={() => {
+            const element = document.getElementById('completed-devices');
+            element?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onMouseEnter={(e) => {
+            if (stats.completed > 0) {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 8px 16px rgba(5, 150, 105, 0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <div className="stat-value" style={{ color: '#059669', fontSize: '2.5rem' }}>{stats.completed}</div>
+          <div className="stat-label" style={{ fontSize: '1rem', fontWeight: 600 }}>مكتملة</div>
+          {stats.completed > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6c757d' }}>
+              اضغط للدخول
+            </div>
+          )}
         </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#C7B58D' }}>{stats.transferred}</div>
-          <div className="stat-label">متحولة - يجب استلامها</div>
+        <div 
+          className="stat-card"
+          style={{ 
+            cursor: 'pointer',
+            border: stats.transferred > 0 ? '2px solid #C7B58D' : '2px solid transparent',
+            background: stats.transferred > 0 ? 'rgba(199, 181, 141, 0.05)' : 'white',
+            transition: 'all 0.3s'
+          }}
+          onClick={() => {
+            setFilterStatus('transferred');
+            const element = document.getElementById('all-devices');
+            element?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onMouseEnter={(e) => {
+            if (stats.transferred > 0) {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 8px 16px rgba(199, 181, 141, 0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <div className="stat-value" style={{ color: '#C7B58D', fontSize: '2.5rem' }}>{stats.transferred}</div>
+          <div className="stat-label" style={{ fontSize: '1rem', fontWeight: 600 }}>متحولة - يجب استلامها</div>
+          {stats.transferred > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6c757d' }}>
+              اضغط للدخول
+            </div>
+          )}
         </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#dc2626' }}>{stats.awaitingApproval}</div>
-          <div className="stat-label">انتظار موافقة</div>
+        <div 
+          className="stat-card"
+          style={{ 
+            cursor: 'pointer',
+            border: stats.awaitingApproval > 0 ? '2px solid #dc2626' : '2px solid transparent',
+            background: stats.awaitingApproval > 0 ? 'rgba(220, 38, 38, 0.05)' : 'white',
+            transition: 'all 0.3s'
+          }}
+          onClick={() => {
+            const element = document.getElementById('awaiting-approval-devices');
+            element?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onMouseEnter={(e) => {
+            if (stats.awaitingApproval > 0) {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 8px 16px rgba(220, 38, 38, 0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <div className="stat-value" style={{ color: '#dc2626', fontSize: '2.5rem' }}>{stats.awaitingApproval}</div>
+          <div className="stat-label" style={{ fontSize: '1rem', fontWeight: 600 }}>انتظار موافقة</div>
+          {stats.awaitingApproval > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6c757d' }}>
+              اضغط للدخول
+            </div>
+          )}
         </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#002147' }}>{stats.new}</div>
-          <div className="stat-label">جديدة/مستلمة من الفني</div>
+        <div 
+          className="stat-card"
+          style={{ 
+            cursor: 'pointer',
+            border: stats.new > 0 ? '2px solid #002147' : '2px solid transparent',
+            background: stats.new > 0 ? 'rgba(0, 33, 71, 0.05)' : 'white',
+            transition: 'all 0.3s'
+          }}
+          onClick={() => {
+            const element = document.getElementById('new-devices');
+            element?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onMouseEnter={(e) => {
+            if (stats.new > 0) {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 33, 71, 0.2)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <div className="stat-value" style={{ color: '#002147', fontSize: '2.5rem' }}>{stats.new}</div>
+          <div className="stat-label" style={{ fontSize: '1rem', fontWeight: 600 }}>جديدة/مستلمة من الفني</div>
+          {stats.new > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6c757d' }}>
+              اضغط للدخول
+            </div>
+          )}
         </div>
       </div>
 
       {/* Technician Stats */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <div className="card-header">
-          <h2 className="card-title">الفنيين والأجهزة</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-          {getTechnicianStats().map(stat => (
-            <div
-              key={stat.technicianId}
-              style={{
-                padding: '1rem',
-                background: '#f3f4f6',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onClick={() => {
-                setFilterStatus('in_repair');
-                setSearchTerm(stat.technicianName);
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#f3f4f6';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <UserIcon size={20} color="#002147" />
-                <span style={{ fontWeight: 600 }}>{stat.technicianName}</span>
+      {getTechnicianStats().filter(s => s.deviceCount > 0).length > 0 && (
+        <div className="card" style={{ marginBottom: '2rem', border: '2px solid #002147' }}>
+          <div className="card-header" style={{ 
+            borderBottom: '2px solid #002147',
+            background: 'rgba(0, 33, 71, 0.1)',
+            padding: '1.5rem'
+          }}>
+            <h2 className="card-title" style={{ color: '#002147', margin: 0 }}>
+              الفنيين والأجهزة قيد التصليح
+            </h2>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.875rem', color: '#495057' }}>
+              اضغط على أي فني لعرض أجهزته وتفاصيلها
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', padding: '1.5rem' }}>
+            {getTechnicianStats().filter(s => s.deviceCount > 0).map(stat => (
+              <div
+                key={stat.technicianId}
+                style={{
+                  padding: '1.25rem',
+                  background: 'rgba(0, 33, 71, 0.05)',
+                  borderRadius: '0.75rem',
+                  border: '2px solid #C7B58D',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  textAlign: 'center'
+                }}
+                onClick={() => handleViewTechnicianDevices(stat.technicianId, stat.technicianName)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 33, 71, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 33, 71, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 33, 71, 0.05)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '0.75rem', 
+                  marginBottom: '1rem'
+                }}>
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #002147 0%, #003366 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: '1.25rem'
+                  }}>
+                    {stat.technicianName.charAt(0)}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 700, color: '#002147', fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+                  {stat.technicianName}
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#002147', marginBottom: '0.25rem' }}>
+                  {stat.deviceCount}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: 500 }}>
+                  جهاز قيد التصليح
+                </div>
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1f2937' }}>
-                {stat.deviceCount}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>جهاز</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Actions Bar */}
       <div className="card" style={{ marginBottom: '2rem' }}>
@@ -226,9 +478,22 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
 
       {/* New/Received Devices */}
       {newDevices.length > 0 && (
-        <div className="card" style={{ marginBottom: '2rem' }}>
-          <div className="card-header">
-            <h2 className="card-title">الأجهزة الجديدة/المستلمة من الفني</h2>
+        <div id="new-devices" className="card" style={{ 
+          marginBottom: '2rem',
+          border: '2px solid #002147',
+          background: 'rgba(0, 33, 71, 0.02)'
+        }}>
+          <div className="card-header" style={{ 
+            borderBottom: '2px solid #002147',
+            background: 'rgba(0, 33, 71, 0.1)',
+            padding: '1.5rem'
+          }}>
+            <h2 className="card-title" style={{ color: '#002147', margin: 0 }}>
+              الأجهزة الجديدة/المستلمة من الفني ({newDevices.length})
+            </h2>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.875rem', color: '#495057' }}>
+              الأجهزة التي تم إضافتها حديثاً أو استلامها من الفني
+            </p>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
@@ -258,38 +523,56 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleViewDevice(device)}
-                          className="btn btn-secondary btn-sm"
-                          title="فحص"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleInspectDevice(device)}
-                          className="btn btn-success btn-sm"
-                          title="فحص"
-                        >
-                          <FileText size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleTransferDevice(device)}
                           className="btn btn-primary btn-sm"
-                          title="تحويل"
+                          title="فحص"
+                          style={{
+                            background: '#002147',
+                            color: 'white',
+                            border: 'none',
+                            fontWeight: 600
+                          }}
                         >
-                          <Send size={14} />
+                          <ClipboardCheck size={16} />
+                          فحص
                         </button>
                         <button
                           onClick={() => handleEditDevice(device)}
                           className="btn btn-secondary btn-sm"
                           title="تحرير"
+                          style={{
+                            background: 'var(--gray-200)',
+                            color: 'var(--gray-900)',
+                            border: '1px solid var(--gray-300)'
+                          }}
                         >
-                          <Edit size={14} />
+                          <Edit size={16} />
+                          تحرير
+                        </button>
+                        <button
+                          onClick={() => handleTransferDevice(device)}
+                          className="btn btn-primary btn-sm"
+                          title="تحويل"
+                          style={{
+                            background: '#002147',
+                            color: 'white',
+                            fontWeight: 600
+                          }}
+                        >
+                          <Send size={16} />
+                          تحويل
                         </button>
                         <button
                           onClick={() => handleCompleteDevice(device)}
                           className="btn btn-success btn-sm"
                           title="إنهاء التقرير"
+                          style={{
+                            background: '#059669',
+                            color: 'white',
+                            fontWeight: 600
+                          }}
                         >
-                          <CheckCircle size={14} />
+                          <CheckCircle size={16} />
+                          إنهاء التقرير
                         </button>
                       </div>
                     </td>
@@ -302,10 +585,23 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
       )}
 
       {/* Awaiting Approval */}
-      {devices.filter(d => d.status === 'awaiting_approval').length > 0 && (
-        <div className="card" style={{ marginBottom: '2rem' }}>
-          <div className="card-header">
-            <h2 className="card-title">الأجهزة قيد انتظار الموافقة</h2>
+      {awaitingApprovalDevices.length > 0 && (
+        <div id="awaiting-approval-devices" className="card" style={{ 
+          marginBottom: '2rem',
+          border: '2px solid #dc2626',
+          background: 'rgba(220, 38, 38, 0.02)'
+        }}>
+          <div className="card-header" style={{ 
+            borderBottom: '2px solid #dc2626',
+            background: 'rgba(220, 38, 38, 0.1)',
+            padding: '1.5rem'
+          }}>
+            <h2 className="card-title" style={{ color: '#dc2626', margin: 0 }}>
+              الأجهزة قيد انتظار الموافقة ({awaitingApprovalDevices.length})
+            </h2>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.875rem', color: '#495057' }}>
+              الأجهزة التي تحتاج موافقة - يمكنك عرض التفاصيل والموافقة على التقرير
+            </p>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
@@ -313,30 +609,185 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
                 <tr>
                   <th>رقم الطلب</th>
                   <th>اسم الجهاز</th>
+                  <th>IMEI</th>
                   <th>سبب الموافقة</th>
+                  <th>الموقع</th>
+                  <th>تاريخ الإضافة</th>
                   <th>الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {devices.filter(d => d.status === 'awaiting_approval').map(device => (
+                {awaitingApprovalDevices.map(device => (
                   <tr key={device.id}>
                     <td>{device.orderNumber}</td>
                     <td>{device.deviceName}</td>
+                    <td>{device.imei}</td>
                     <td>{device.approvalReason || 'غير محدد'}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {device.location === 'operations' && 'العمليات'}
+                      {device.location === 'technician' && 'الفني'}
+                      {device.location === 'storage' && 'المخزن'}
+                      {device.location === 'customer' && 'الزبون'}
+                    </td>
+                    <td>{format(new Date(device.createdAt), 'yyyy-MM-dd HH:mm')}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleViewDevice(device)}
                           className="btn btn-secondary btn-sm"
+                          style={{
+                            background: 'var(--gray-200)',
+                            color: 'var(--gray-900)',
+                            border: '1px solid var(--gray-300)'
+                          }}
                         >
-                          <Eye size={14} />
+                          <Eye size={16} />
+                          عرض التفاصيل
+                        </button>
+                        <button
+                          onClick={() => handleApproveDevice(device)}
+                          className="btn btn-success btn-sm"
+                          style={{
+                            background: '#059669',
+                            color: 'white',
+                            fontWeight: 600,
+                            border: 'none',
+                            boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#047857';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#059669';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          <CheckCircle size={16} />
+                          موافقة
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* In Repair Devices */}
+      {inRepairDevices.length > 0 && (
+        <div id="in-repair-devices" className="card" style={{ 
+          marginBottom: '2rem',
+          border: '2px solid #002147',
+          background: 'rgba(0, 33, 71, 0.02)'
+        }}>
+          <div className="card-header" style={{ 
+            borderBottom: '2px solid #002147',
+            background: 'rgba(0, 33, 71, 0.1)',
+            padding: '1.5rem'
+          }}>
+            <h2 className="card-title" style={{ color: '#002147', margin: 0 }}>
+              الأجهزة قيد التصليح ({inRepairDevices.length})
+            </h2>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.875rem', color: '#495057' }}>
+              جميع الأجهزة قيد التصليح مع موقعها وحالتها والتقارير المضافة
+              {selectedTechnician && (
+                <span style={{ 
+                  marginRight: '0.5rem',
+                  padding: '0.25rem 0.75rem',
+                  background: '#C7B58D',
+                  color: '#002147',
+                  borderRadius: '20px',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600
+                }}>
+                  فلترة: {getTechnicianStats().find(s => s.technicianId === selectedTechnician)?.technicianName}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTechnician(null);
+                      setSearchTerm('');
+                    }}
+                    style={{
+                      marginRight: '0.5rem',
+                      background: 'none',
+                      border: 'none',
+                      color: '#002147',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+            </p>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>رقم الطلب</th>
+                  <th>اسم الجهاز</th>
+                  <th>IMEI</th>
+                  <th>نوع العطل</th>
+                  <th>الموقع</th>
+                  <th>الفني</th>
+                  <th>عدد التقارير</th>
+                  <th>تاريخ الإضافة</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInRepairDevices.map(device => (
+                  <tr key={device.id}>
+                    <td>{device.orderNumber}</td>
+                    <td>{device.deviceName}</td>
+                    <td>{device.imei}</td>
+                    <td>{device.faultType}</td>
+                    <td>
+                      {device.location === 'operations' && 'العمليات'}
+                      {device.location === 'technician' && 'الفني'}
+                      {device.location === 'storage' && 'المخزن'}
+                      {device.location === 'customer' && 'الزبون'}
+                    </td>
+                    <td>{device.technicianName || '-'}</td>
+                    <td>
+                      <span className="badge badge-primary">
+                        {device.reports?.length || 0} تقرير
+                      </span>
+                    </td>
+                    <td>{format(new Date(device.createdAt), 'yyyy-MM-dd HH:mm')}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleViewDevice(device)}
+                          className="btn btn-secondary btn-sm"
+                          style={{
+                            background: 'var(--gray-200)',
+                            color: 'var(--gray-900)',
+                            border: '1px solid var(--gray-300)'
+                          }}
+                        >
+                          <Eye size={16} />
                           عرض التفاصيل
                         </button>
                         <button
                           onClick={() => handleTransferDevice(device)}
                           className="btn btn-primary btn-sm"
+                          style={{
+                            background: '#002147',
+                            color: 'white',
+                            fontWeight: 600
+                          }}
                         >
-                          <Send size={14} />
+                          <Send size={16} />
                           تحويل
                         </button>
                       </div>
@@ -349,8 +800,86 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
         </div>
       )}
 
+      {/* Completed Devices */}
+      {completedDevices.length > 0 && (
+        <div id="completed-devices" className="card" style={{ 
+          marginBottom: '2rem',
+          border: '2px solid #059669',
+          background: 'rgba(5, 150, 105, 0.02)'
+        }}>
+          <div className="card-header" style={{ 
+            borderBottom: '2px solid #059669',
+            background: 'rgba(5, 150, 105, 0.1)',
+            padding: '1.5rem'
+          }}>
+            <h2 className="card-title" style={{ color: '#059669', margin: 0 }}>
+              الأجهزة المكتملة ({completedDevices.length})
+            </h2>
+            <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.875rem', color: '#495057' }}>
+              الأجهزة التي تم إنهاء تقريرها (تم التصليح - لا يصلح مع السبب) وموقعها
+            </p>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>رقم الطلب</th>
+                  <th>اسم الجهاز</th>
+                  <th>IMEI</th>
+                  <th>حالة التصليح</th>
+                  <th>سبب عدم الإصلاح</th>
+                  <th>الموقع</th>
+                  <th>تاريخ الإكمال</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completedDevices.map(device => (
+                  <tr key={device.id}>
+                    <td>{device.orderNumber}</td>
+                    <td>{device.deviceName}</td>
+                    <td>{device.imei}</td>
+                    <td>
+                      {device.isRepairable === true && (
+                        <span className="badge badge-success">تم التصليح</span>
+                      )}
+                      {device.isRepairable === false && (
+                        <span className="badge badge-danger">لا يصلح</span>
+                      )}
+                    </td>
+                    <td>{device.repairReason || '-'}</td>
+                    <td>
+                      {device.location === 'operations' && 'العمليات'}
+                      {device.location === 'technician' && 'الفني'}
+                      {device.location === 'storage' && 'المخزن'}
+                      {device.location === 'customer' && 'الزبون'}
+                    </td>
+                    <td>{format(new Date(device.updatedAt), 'yyyy-MM-dd HH:mm')}</td>
+                    <td>
+                      <button
+                        onClick={() => handleViewDevice(device)}
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          background: 'var(--gray-200)',
+                          color: 'var(--gray-900)',
+                          border: '1px solid var(--gray-300)',
+                          fontWeight: 600
+                        }}
+                      >
+                        <Eye size={16} />
+                        عرض التفاصيل
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* All Devices Table */}
-      <div className="card">
+      <div id="all-devices" className="card">
         <div className="card-header">
           <h2 className="card-title">جميع الأجهزة</h2>
         </div>
@@ -394,12 +923,21 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
                   <td>{format(new Date(device.createdAt), 'yyyy-MM-dd HH:mm')}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button
-                        onClick={() => handleViewDevice(device)}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        <Eye size={14} />
-                      </button>
+                      {(device.status === 'new' || device.status === 'received_from_technician') && (
+                        <button
+                          onClick={() => handleViewDevice(device)}
+                          className="btn btn-primary btn-sm"
+                          style={{
+                            background: '#002147',
+                            color: 'white',
+                            border: 'none',
+                            fontWeight: 600
+                          }}
+                        >
+                          <ClipboardCheck size={16} />
+                          فحص
+                        </button>
+                      )}
                       {device.status === 'transferred' && device.location === 'technician' && (
                         <button
                           onClick={() => handleReceiveFromTechnician(device)}
@@ -424,6 +962,19 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
                           </button>
                         </>
                       )}
+                      <button
+                        onClick={() => handleDeleteDevice(device)}
+                        className="btn btn-danger btn-sm"
+                        style={{
+                          background: '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.375rem 0.5rem'
+                        }}
+                        title="حذف الجهاز"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -462,9 +1013,19 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
       {showDetailsModal && selectedDevice && (
         <DeviceDetailsModal
           device={selectedDevice}
+          user={user}
           onClose={() => {
             setShowDetailsModal(false);
             setSelectedDevice(null);
+          }}
+          onSuccess={async () => {
+            await loadDevices();
+            // Reload device to show new report
+            const allDevices = await storage.getDevices();
+            const updatedDevice = allDevices.find(d => d.id === selectedDevice.id);
+            if (updatedDevice) {
+              setSelectedDevice(updatedDevice);
+            }
           }}
         />
       )}

@@ -1,108 +1,162 @@
 import { Device, User, DeviceReport } from '../types';
+import { apiService } from '../services/apiService';
 
 const STORAGE_KEYS = {
-  USERS: 'josck_users',
-  DEVICES: 'josck_devices',
   CURRENT_USER: 'josck_current_user',
 };
 
+// Cache for users and devices to avoid multiple Firebase calls
+let usersCache: User[] | null = null;
+let devicesCache: Device[] | null = null;
+
 export const storage = {
   // Users
-  getUsers: (): User[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.USERS);
-    if (!data) {
-      // Initialize with default users
-      const defaultUsers: User[] = [
-        {
-          id: '1',
-          username: 'admin',
-          password: 'admin123',
-          name: 'مدير النظام',
-          role: 'admin',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          username: 'operations',
-          password: 'ops123',
-          name: 'موظف العمليات',
-          role: 'operations',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '3',
-          username: 'technician1',
-          password: 'tech123',
-          name: 'فني 1',
-          role: 'technician',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '4',
-          username: 'technician2',
-          password: 'tech123',
-          name: 'فني 2',
-          role: 'technician',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '5',
-          username: 'customer_service',
-          password: 'cs123',
-          name: 'خدمة العملاء',
-          role: 'customer_service',
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
-      return defaultUsers;
+  getUsers: async (): Promise<User[]> => {
+    try {
+      if (usersCache) {
+        return usersCache;
+      }
+      const users = await apiService.getUsers();
+      usersCache = users;
+      return users;
+    } catch (error) {
+      console.error('Error getting users:', error);
+      // Throw error instead of returning empty array so callers can handle it
+      throw error;
     }
-    return JSON.parse(data);
   },
 
-  saveUsers: (users: User[]): void => {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  // Synchronous version for backward compatibility (returns empty array initially)
+  getUsersSync: (): User[] => {
+    return usersCache || [];
+  },
+
+  saveUsers: async (users: User[]): Promise<void> => {
+    try {
+      // Update cache
+      usersCache = users;
+      // Note: In Firebase, we update users individually, not as a batch
+      // This method is kept for compatibility but may need refactoring
+      console.warn('saveUsers called - consider using individual update methods');
+    } catch (error) {
+      console.error('Error saving users:', error);
+    }
   },
 
   // Devices
-  getDevices: (): Device[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.DEVICES);
-    return data ? JSON.parse(data) : [];
-  },
-
-  saveDevices: (devices: Device[]): void => {
-    localStorage.setItem(STORAGE_KEYS.DEVICES, JSON.stringify(devices));
-  },
-
-  addDevice: (device: Device): void => {
-    const devices = storage.getDevices();
-    devices.push(device);
-    storage.saveDevices(devices);
-  },
-
-  updateDevice: (deviceId: string, updates: Partial<Device>): void => {
-    const devices = storage.getDevices();
-    const index = devices.findIndex(d => d.id === deviceId);
-    if (index !== -1) {
-      devices[index] = { ...devices[index], ...updates, updatedAt: new Date().toISOString() };
-      storage.saveDevices(devices);
-    }
-  },
-
-  addReport: (deviceId: string, report: DeviceReport): void => {
-    const devices = storage.getDevices();
-    const index = devices.findIndex(d => d.id === deviceId);
-    if (index !== -1) {
-      if (!devices[index].reports) {
-        devices[index].reports = [];
+  getDevices: async (): Promise<Device[]> => {
+    try {
+      if (devicesCache) {
+        return devicesCache;
       }
-      devices[index].reports.push(report);
-      devices[index].updatedAt = new Date().toISOString();
-      storage.saveDevices(devices);
+      const devices = await apiService.getDevices();
+      devicesCache = devices;
+      return devices;
+    } catch (error) {
+      console.error('Error getting devices:', error);
+      return [];
     }
   },
 
-  // Current User
+  // Synchronous version for backward compatibility (returns empty array initially)
+  getDevicesSync: (): Device[] => {
+    return devicesCache || [];
+  },
+
+  saveDevices: async (devices: Device[]): Promise<void> => {
+    try {
+      // Update cache
+      devicesCache = devices;
+      // Note: In Firebase, we update devices individually, not as a batch
+      // This method is kept for compatibility but may need refactoring
+      console.warn('saveDevices called - consider using individual update methods');
+    } catch (error) {
+      console.error('Error saving devices:', error);
+    }
+  },
+
+  addDevice: async (device: Device): Promise<void> => {
+    try {
+      const { id, createdAt, updatedAt, ...deviceData } = device;
+      const newDevice = await apiService.addDevice(deviceData as Omit<Device, 'id' | 'createdAt' | 'updatedAt'>);
+      if (newDevice) {
+        // Update cache
+        if (devicesCache) {
+          devicesCache = [newDevice, ...devicesCache];
+        } else {
+          devicesCache = await apiService.getDevices();
+        }
+      }
+    } catch (error) {
+      console.error('Error adding device:', error);
+      throw error;
+    }
+  },
+
+  updateDevice: async (deviceId: string, updates: Partial<Device>): Promise<void> => {
+    try {
+      const result = await apiService.updateDevice(deviceId, updates);
+      if (result.success) {
+        // Update cache
+        if (devicesCache) {
+          const index = devicesCache.findIndex(d => d.id === deviceId);
+          if (index !== -1) {
+            devicesCache[index] = { ...devicesCache[index], ...updates, updatedAt: new Date().toISOString() };
+          }
+        } else {
+          devicesCache = await apiService.getDevices();
+        }
+      }
+    } catch (error) {
+      console.error('Error updating device:', error);
+      throw error;
+    }
+  },
+
+  addReport: async (deviceId: string, report: DeviceReport): Promise<void> => {
+    try {
+      const result = await apiService.addReport(deviceId, report);
+      if (result && result.success) {
+        // Update cache
+        if (devicesCache) {
+          const index = devicesCache.findIndex(d => d.id === deviceId);
+          if (index !== -1) {
+            if (!devicesCache[index].reports) {
+              devicesCache[index].reports = [];
+            }
+            devicesCache[index].reports.push(report);
+            devicesCache[index].updatedAt = new Date().toISOString();
+          }
+        } else {
+          devicesCache = await apiService.getDevices();
+        }
+      }
+    } catch (error) {
+      console.error('Error adding report:', error);
+      throw error;
+    }
+  },
+
+  deleteDevice: async (deviceId: string): Promise<boolean> => {
+    try {
+      const result = await apiService.deleteDevice(deviceId);
+      if (result && result.success) {
+        // Update cache
+        if (devicesCache) {
+          devicesCache = devicesCache.filter(d => d.id !== deviceId);
+        } else {
+          devicesCache = await apiService.getDevices();
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error deleting device:', error);
+      throw error;
+    }
+  },
+
+  // Current User (still using localStorage for session management)
   getCurrentUser: (): User | null => {
     const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     return data ? JSON.parse(data) : null;
@@ -115,6 +169,68 @@ export const storage = {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     }
   },
+
+  // Add user
+  addUser: async (user: Omit<User, 'id' | 'createdAt'>): Promise<User | null> => {
+    try {
+      const newUser = await apiService.addUser(user);
+      
+      if (newUser && newUser.id) {
+        // Update cache immediately
+        if (usersCache) {
+          usersCache = [...usersCache, newUser];
+        } else {
+          usersCache = await apiService.getUsers();
+        }
+        return newUser;
+      }
+      throw new Error('فشل إضافة المستخدم: لم يتم إرجاع بيانات المستخدم من السيرفر');
+    } catch (error: any) {
+      console.error('Error adding user in storage:', error);
+      // Re-throw the error with a user-friendly message
+      if (error?.message) {
+        throw error;
+      }
+      throw new Error('حدث خطأ أثناء إضافة المستخدم. تأكد من اتصال السيرفر وأنك مسجل دخول كمدير.');
+    }
+  },
+
+  // Delete user
+  deleteUser: async (userId: string): Promise<boolean> => {
+    try {
+      const result = await apiService.deleteUser(userId);
+      
+      if (result && result.success) {
+        // Update cache
+        if (usersCache) {
+          usersCache = usersCache.filter(u => u.id !== userId);
+        } else {
+          usersCache = await apiService.getUsers();
+        }
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      console.error('Error deleting user in storage:', error);
+      throw error;
+    }
+  },
+
+  // Helper methods to refresh cache
+  refreshUsers: async (): Promise<void> => {
+    usersCache = await apiService.getUsers();
+  },
+
+  refreshDevices: async (): Promise<void> => {
+    devicesCache = await apiService.getDevices();
+  },
+
+  // Clear cache
+  clearCache: (): void => {
+    usersCache = null;
+    devicesCache = null;
+  },
 };
+
 
 

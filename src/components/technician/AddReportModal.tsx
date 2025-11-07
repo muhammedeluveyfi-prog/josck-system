@@ -13,20 +13,25 @@ interface AddReportModalProps {
 export default function AddReportModal({ device, technician, onClose, onSuccess }: AddReportModalProps) {
   const [report, setReport] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    storage.addReport(device.id, {
-      id: Date.now().toString(),
-      deviceId: device.id,
-      content: report,
-      authorId: technician.id,
-      authorName: technician.name,
-      authorRole: 'technician',
-      createdAt: new Date().toISOString(),
-    });
+    try {
+      await storage.addReport(device.id, {
+        id: Date.now().toString(),
+        deviceId: device.id,
+        content: report,
+        authorId: technician.id,
+        authorName: technician.name,
+        authorRole: 'technician',
+        createdAt: new Date().toISOString(),
+      });
 
-    onSuccess();
+      onSuccess();
+    } catch (error) {
+      console.error('Error adding report:', error);
+      alert('حدث خطأ أثناء إضافة التقرير');
+    }
   };
 
   return (
@@ -74,5 +79,6 @@ export default function AddReportModal({ device, technician, onClose, onSuccess 
     </div>
   );
 }
+
 
 

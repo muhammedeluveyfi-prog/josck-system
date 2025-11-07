@@ -23,9 +23,17 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     loadData();
   }, []);
 
-  const loadData = () => {
-    setUsers(storage.getUsers());
-    setDevices(storage.getDevices());
+  const loadData = async () => {
+    try {
+      const [allUsers, allDevices] = await Promise.all([
+        storage.getUsers(),
+        storage.getDevices(),
+      ]);
+      setUsers(allUsers);
+      setDevices(allDevices);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const handleEditUser = (user: User) => {
@@ -33,11 +41,52 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     setShowEditUserModal(true);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
-      const updatedUsers = users.filter(u => u.id !== userId);
-      storage.saveUsers(updatedUsers);
-      loadData();
+  const handleDeleteUser = async (userId: string) => {
+    const userToDelete = users.find(u => u.id === userId);
+    const userName = userToDelete?.name || 'هذا المستخدم';
+    
+    if (window.confirm(`هل أنت متأكد من حذف المستخدم "${userName}"؟\n\nهذه العملية لا يمكن التراجع عنها.`)) {
+      try {
+        const success = await storage.deleteUser(userId);
+        if (success) {
+          alert(`✓ تم حذف المستخدم "${userName}" بنجاح`);
+          await loadData();
+        } else {
+          alert('حدث خطأ أثناء حذف المستخدم');
+        }
+      } catch (error: any) {
+        console.error('Error deleting user:', error);
+        let errorMessage = 'حدث خطأ أثناء حذف المستخدم';
+        
+        if (error?.message) {
+          if (error.message.includes('Access token required') || error.message.includes('Invalid or expired token')) {
+            errorMessage = 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.';
+          } else if (error.message.includes('Admin access required')) {
+            errorMessage = 'ليس لديك صلاحية لحذف المستخدمين. يجب أن تكون مدير.';
+          } else {
+            errorMessage = error.message;
+          }
+        }
+        
+        alert(errorMessage);
+      }
+    }
+  };
+
+  const handleDeleteDevice = async (device: Device) => {
+    const deviceName = device.deviceName || device.orderNumber;
+    if (window.confirm(`هل أنت متأكد من حذف الجهاز "${deviceName}"؟\n\nهذه العملية لا يمكن التراجع عنها.`)) {
+      try {
+        const success = await storage.deleteDevice(device.id);
+        if (success) {
+          await loadData();
+        } else {
+          alert('حدث خطأ أثناء حذف الجهاز');
+        }
+      } catch (error) {
+        console.error('Error deleting device:', error);
+        alert('حدث خطأ أثناء حذف الجهاز');
+      }
     }
   };
 
@@ -164,6 +213,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 <th>الفني</th>
                 <th>تاريخ الإضافة</th>
                 <th>آخر تحديث</th>
+                <th>الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +241,21 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     <td>{device.technicianName || '-'}</td>
                     <td>{format(new Date(device.createdAt), 'yyyy-MM-dd HH:mm')}</td>
                     <td>{format(new Date(device.updatedAt), 'yyyy-MM-dd HH:mm')}</td>
+                    <td>
+                      <button
+                        onClick={() => handleDeleteDevice(device)}
+                        className="btn btn-danger btn-sm"
+                        style={{
+                          background: '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.375rem 0.5rem'
+                        }}
+                        title="حذف الجهاز"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
             </tbody>
@@ -201,10 +266,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       {/* Modals */}
       {showAddUserModal && (
         <AddUserModal
-          onClose={() => setShowAddUserModal(false)}
-          onSuccess={() => {
+          onClose={() => {
             setShowAddUserModal(false);
-            loadData();
+          }}
+          onSuccess={async () => {
+            setShowAddUserModal(false);
+            // إعادة تحميل البيانات للتأكد من ظهور المستخدم الجديد
+            await loadData();
           }}
         />
       )}

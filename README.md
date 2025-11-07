@@ -38,7 +38,8 @@
 - **React Router** - للتنقل بين الصفحات
 - **date-fns** - لإدارة التاريخ والوقت
 - **lucide-react** - للأيقونات
-- **LocalStorage** - لتخزين البيانات محلياً
+- **Firebase Firestore** - قاعدة البيانات السحابية
+- **Firebase Authentication** - نظام المصادقة (جاهز للاستخدام)
 
 ## التثبيت والتشغيل
 
@@ -125,14 +126,39 @@ josck-system/
 - `awaiting_approval`: جهاز في انتظار موافقة الزبون
 - `received_from_technician`: جهاز مستلم من الفني
 
+## إعداد Firebase
+
+هذا المشروع يستخدم Firebase Firestore كقاعدة بيانات. اتبع الخطوات التالية:
+
+1. **إنشاء مشروع Firebase:**
+   - اذهب إلى [Firebase Console](https://console.firebase.google.com/)
+   - أنشئ مشروع جديد
+
+2. **إعداد Firestore Database:**
+   - في Firebase Console، اذهب إلى Firestore Database
+   - أنشئ قاعدة بيانات (اختر Test mode للبداية)
+
+3. **إعداد متغيرات البيئة:**
+   - أنشئ ملف `.env` في المجلد الرئيسي
+   - أضف متغيرات Firebase من Firebase Console (انظر `FIREBASE_SETUP.md` للتفاصيل)
+
+4. **التشغيل:**
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+للتفاصيل الكاملة، راجع ملف `FIREBASE_SETUP.md`
+
 ## ملاحظات مهمة
 
-- البيانات تُخزن محلياً في LocalStorage
-- لتطبيق حقيقي، يجب استبدال LocalStorage بقاعدة بيانات حقيقية
+- البيانات تُخزن في Firebase Firestore
+- يجب إعداد Firebase قبل تشغيل المشروع
 - يمكن إضافة المزيد من الميزات مثل التصدير والطباعة
 
 ## الترخيص
 
 هذا المشروع تم إنشاؤه لأغراض تعليمية وتجارية.
+
 
 

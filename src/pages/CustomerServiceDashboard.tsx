@@ -18,7 +18,7 @@ export default function CustomerServiceDashboard({ user, onLogout }: CustomerSer
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setError('');
     setDevice(null);
 
@@ -27,19 +27,24 @@ export default function CustomerServiceDashboard({ user, onLogout }: CustomerSer
       return;
     }
 
-    const devices = storage.getDevices();
-    let foundDevice: Device | undefined;
+    try {
+      const devices = await storage.getDevices();
+      let foundDevice: Device | undefined;
 
-    if (searchType === 'order') {
-      foundDevice = devices.find(d => d.orderNumber === searchTerm);
-    } else {
-      foundDevice = devices.find(d => d.phoneNumber === searchTerm);
-    }
+      if (searchType === 'order') {
+        foundDevice = devices.find(d => d.orderNumber === searchTerm);
+      } else {
+        foundDevice = devices.find(d => d.phoneNumber === searchTerm);
+      }
 
-    if (foundDevice) {
-      setDevice(foundDevice);
-    } else {
-      setError('لم يتم العثور على الجهاز');
+      if (foundDevice) {
+        setDevice(foundDevice);
+      } else {
+        setError('لم يتم العثور على الجهاز');
+      }
+    } catch (error) {
+      console.error('Error searching for device:', error);
+      setError('حدث خطأ أثناء البحث');
     }
   };
 
@@ -50,7 +55,7 @@ export default function CustomerServiceDashboard({ user, onLogout }: CustomerSer
   };
 
   return (
-    <Layout title="واجهة الاستعلام عن جهاز" user={user} onLogout={onLogout}>
+    <Layout title="واجهة الاستعلام عن جهاز" user={user} onLogout={onLogout} showNotifications={false}>
       <div className="card" style={{ maxWidth: '800px', margin: '0 auto' }}>
         <div className="card-header">
           <h2 className="card-title">البحث عن جهاز</h2>

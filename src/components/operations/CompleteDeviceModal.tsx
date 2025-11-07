@@ -14,18 +14,23 @@ export default function CompleteDeviceModal({ device, onClose, onSuccess }: Comp
   const [finalReport, setFinalReport] = useState('');
   const [repairReason, setRepairReason] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    storage.updateDevice(device.id, {
-      status: 'completed',
-      location: 'storage',
-      isRepairable: isRepairable,
-      finalReport: finalReport,
-      repairReason: isRepairable === false ? repairReason : undefined,
-    });
+    try {
+      await storage.updateDevice(device.id, {
+        status: 'completed',
+        location: 'storage',
+        isRepairable: isRepairable,
+        finalReport: finalReport,
+        repairReason: isRepairable === false ? repairReason : undefined,
+      });
 
-    onSuccess();
+      onSuccess();
+    } catch (error) {
+      console.error('Error completing device:', error);
+      alert('حدث خطأ أثناء إنهاء التقرير');
+    }
   };
 
   return (
@@ -113,5 +118,6 @@ export default function CompleteDeviceModal({ device, onClose, onSuccess }: Comp
     </div>
   );
 }
+
 
 
