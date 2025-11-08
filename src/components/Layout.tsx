@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
-import { LogOut, User, AlertTriangle, Clock, X, ChevronDown } from 'lucide-react';
+import { LogOut, User, AlertTriangle, X, ChevronDown } from 'lucide-react';
 import { storage } from '../utils/storage';
 import { Device } from '../types';
 import { getDevicesWithNotifications, calculateTimeRemaining, TimeRemaining } from '../utils/timeUtils';
@@ -71,7 +71,7 @@ export default function Layout({ title, user, onLogout, children, showNotificati
             const timeRemaining = calculateTimeRemaining(device);
             return timeRemaining ? { device, timeRemaining } : null;
           })
-          .filter((item): item is { device: Device; timeRemaining: ReturnType<typeof calculateTimeRemaining> } => item !== null);
+          .filter((item): item is { device: Device; timeRemaining: TimeRemaining } => item !== null);
 
         setNotifications(notificationsData);
       } catch (error) {
