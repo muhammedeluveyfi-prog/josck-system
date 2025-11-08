@@ -74,9 +74,20 @@ const apiRequest = async <T>(
         fetchError.message.includes('NetworkError') ||
         fetchError.message.includes('ERR_CONNECTION_REFUSED') ||
         fetchError.message.includes('انتهت مهلة الاتصال') ||
+        fetchError.message.includes('CORS') ||
         fetchError.name === 'TypeError' ||
         fetchError.name === 'AbortError') {
-      throw new Error('لا يمكن الاتصال بالسيرفر. تأكد من أن السيرفر يعمل على http://localhost:3000');
+      // Check if it's a CORS error
+      if (fetchError.message.includes('CORS') || fetchError.message.includes('Access-Control')) {
+        throw new Error('خطأ في الاتصال: يرجى التحقق من إعدادات CORS في السيرفر');
+      }
+      // Check if we're in production
+      const isProduction = import.meta.env.PROD;
+      if (isProduction) {
+        throw new Error('لا يمكن الاتصال بالسيرفر. يرجى التحقق من أن السيرفر يعمل بشكل صحيح.');
+      } else {
+        throw new Error('لا يمكن الاتصال بالسيرفر. تأكد من أن السيرفر يعمل على http://localhost:3000');
+      }
     }
     throw fetchError;
   }

@@ -254,6 +254,7 @@ export default function Login({ onLogin }: LoginProps) {
               onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="أدخل اسم المستخدم"
+              autoComplete="username"
               style={{
                 padding: '0.875rem 1rem',
                 fontSize: '0.9375rem',
@@ -288,6 +289,7 @@ export default function Login({ onLogin }: LoginProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="أدخل كلمة المرور"
+              autoComplete="current-password"
               style={{
                 padding: '0.875rem 1rem',
                 fontSize: '0.9375rem',
