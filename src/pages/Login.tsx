@@ -345,68 +345,6 @@ export default function Login({ onLogin }: LoginProps) {
             {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
           </button>
         </form>
-
-        <div style={{ 
-          marginTop: '2rem', 
-          padding: '1.25rem', 
-          background: 'rgba(199, 181, 141, 0.1)',
-          borderRadius: '0.75rem', 
-          fontSize: '0.8125rem', 
-          color: '#495057',
-          border: `2px solid rgba(199, 181, 141, 0.3)`
-        }}>
-          <p style={{ 
-            fontWeight: 700, 
-            marginBottom: '1rem',
-            color: '#002147',
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <Shield size={16} color="#002147" />
-            حسابات تجريبية:
-          </p>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(2, 1fr)', 
-            gap: '0.75rem',
-            fontSize: '0.75rem'
-          }}>
-            <div style={{ 
-              padding: '0.5rem', 
-              background: 'white', 
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(199, 181, 141, 0.2)'
-            }}>
-              <strong style={{ color: '#002147' }}>مدير:</strong> admin / admin123
-            </div>
-            <div style={{ 
-              padding: '0.5rem', 
-              background: 'white', 
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(199, 181, 141, 0.2)'
-            }}>
-              <strong style={{ color: '#002147' }}>عمليات:</strong> operations / ops123
-            </div>
-            <div style={{ 
-              padding: '0.5rem', 
-              background: 'white', 
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(199, 181, 141, 0.2)'
-            }}>
-              <strong style={{ color: '#002147' }}>فني:</strong> technician1 / tech123
-            </div>
-            <div style={{ 
-              padding: '0.5rem', 
-              background: 'white', 
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(199, 181, 141, 0.2)'
-            }}>
-              <strong style={{ color: '#002147' }}>خدمة عملاء:</strong> cs / cs123
-            </div>
-          </div>
-        </div>
       </div>
 
       <style>{`
