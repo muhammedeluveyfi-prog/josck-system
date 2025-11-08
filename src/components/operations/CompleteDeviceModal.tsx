@@ -27,9 +27,10 @@ export default function CompleteDeviceModal({ device, onClose, onSuccess }: Comp
       });
 
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error completing device:', error);
-      alert('حدث خطأ أثناء إنهاء التقرير');
+      const errorMessage = error?.message || 'حدث خطأ أثناء إنهاء التقرير. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

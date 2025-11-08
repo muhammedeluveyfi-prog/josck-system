@@ -31,8 +31,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       ]);
       setUsers(allUsers);
       setDevices(allDevices);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading data:', error);
+      // Show user-friendly error message
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحميل البيانات. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

@@ -93,31 +93,47 @@ const apiRequest = async <T>(
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    let error: any = { error: 'Unknown error' };
+    let errorText = '';
+    try {
+      errorText = await response.text();
+      if (errorText) {
+        error = JSON.parse(errorText);
+      }
+    } catch (e) {
+      // If parsing fails, use the text as error message
+      error = { error: errorText || 'Unknown error' };
+    }
     
     // Log error in development
     if (import.meta.env.DEV) {
       console.error('API Error:', {
         status: response.status,
         statusText: response.statusText,
+        endpoint: `${API_BASE_URL}${endpoint}`,
         error,
       });
     }
     
     // Provide user-friendly error messages
-    let errorMessage = error.error || `خطأ في الاتصال (${response.status})`;
+    let errorMessage = error.error || error.details || `خطأ في الاتصال (${response.status})`;
+    
+    // Include details if available (for debugging)
+    if (error.details && import.meta.env.DEV) {
+      errorMessage += ` - ${error.details}`;
+    }
     
     if (response.status === 401) {
-      errorMessage = 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.';
+      errorMessage = error.error || 'اسم المستخدم أو كلمة المرور غير صحيحة';
     } else if (response.status === 403) {
       errorMessage = 'ليس لديك صلاحية للقيام بهذه العملية.';
     } else if (response.status === 404) {
       errorMessage = 'البيانات المطلوبة غير موجودة.';
     } else if (response.status === 503) {
       // Service Unavailable - usually Firebase API not enabled
-      errorMessage = error.error || 'السيرفر غير متاح حالياً. يرجى التحقق من إعدادات Firebase.';
+      errorMessage = error.error || error.details || 'السيرفر غير متاح حالياً. يرجى التحقق من إعدادات Firebase.';
     } else if (response.status >= 500) {
-      errorMessage = error.error || 'خطأ في السيرفر. يرجى المحاولة لاحقاً.';
+      errorMessage = error.error || error.details || 'خطأ في السيرفر. يرجى المحاولة لاحقاً.';
     }
     
     throw new Error(errorMessage);

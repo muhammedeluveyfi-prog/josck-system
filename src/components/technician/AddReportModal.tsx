@@ -28,9 +28,10 @@ export default function AddReportModal({ device, technician, onClose, onSuccess 
       });
 
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding report:', error);
-      alert('حدث خطأ أثناء إضافة التقرير');
+      const errorMessage = error?.message || 'حدث خطأ أثناء إضافة التقرير. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

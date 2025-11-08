@@ -43,8 +43,11 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
       ]);
       setDevices(allDevices);
       setUsers(allUsers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading data:', error);
+      // Show user-friendly error message
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحميل البيانات. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 
@@ -52,8 +55,11 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
     try {
       const allDevices = await storage.getDevices();
       setDevices(allDevices);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading devices:', error);
+      // Show user-friendly error message
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحميل الأجهزة. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 
@@ -121,14 +127,20 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
     setShowCompleteModal(true);
   };
 
-  const handleReceiveFromTechnician = (device: Device) => {
-    storage.updateDevice(device.id, {
-      status: 'received_from_technician',
-      location: 'operations',
-      technicianId: undefined,
-      technicianName: undefined,
-    });
-    loadDevices();
+  const handleReceiveFromTechnician = async (device: Device) => {
+    try {
+      await storage.updateDevice(device.id, {
+        status: 'received_from_technician',
+        location: 'operations',
+        technicianId: undefined,
+        technicianName: undefined,
+      });
+      await loadDevices();
+    } catch (error: any) {
+      console.error('Error receiving device from technician:', error);
+      const errorMessage = error?.message || 'حدث خطأ أثناء استلام الجهاز من الفني. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
+    }
   };
 
   const handleDeleteDevice = async (device: Device) => {

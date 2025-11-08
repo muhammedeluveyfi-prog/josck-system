@@ -118,9 +118,10 @@ export default function EditDeviceModal({ device, onClose, onSuccess }: EditDevi
     try {
       await storage.updateDevice(device.id, updateData);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating device:', error);
-      alert('حدث خطأ أثناء تحديث الجهاز');
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحديث الجهاز. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

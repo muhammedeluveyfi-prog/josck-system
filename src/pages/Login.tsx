@@ -57,10 +57,14 @@ export default function Login({ onLogin }: LoginProps) {
       let errorMessage = 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
       
       if (error?.message) {
-        if (error.message.includes('Invalid username or password')) {
+        if (error.message.includes('Invalid username or password') || error.message.includes('غير صحيحة')) {
           errorMessage = 'اسم المستخدم أو كلمة المرور غير صحيحة';
-        } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-          errorMessage = 'لا يمكن الاتصال بالسيرفر. تأكد من أن السيرفر يعمل على http://localhost:3000';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('Network') || error.message.includes('CORS')) {
+          errorMessage = 'لا يمكن الاتصال بالسيرفر. يرجى التحقق من الاتصال بالإنترنت.';
+        } else if (error.message.includes('Firebase') || error.message.includes('Firestore')) {
+          errorMessage = 'خطأ في قاعدة البيانات. يرجى المحاولة لاحقاً.';
+        } else if (error.message.includes('500') || error.message.includes('Server')) {
+          errorMessage = 'خطأ في السيرفر. يرجى المحاولة لاحقاً أو الاتصال بالدعم الفني.';
         } else {
           errorMessage = error.message;
         }

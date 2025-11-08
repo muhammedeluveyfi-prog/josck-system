@@ -26,8 +26,10 @@ export default function DeviceDetailsModal({ device, user, onClose, onSuccess }:
         if (updatedDevice) {
           setCurrentDevice(updatedDevice);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading device data:', error);
+        // Show error but don't block the modal
+        alert('حدث خطأ أثناء تحميل بيانات الجهاز. يرجى المحاولة مرة أخرى.');
       }
     };
 
@@ -59,9 +61,10 @@ export default function DeviceDetailsModal({ device, user, onClose, onSuccess }:
       setReplyContent('');
       setShowReplyForm(false);
       if (onSuccess) onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding reply:', error);
-      alert('حدث خطأ أثناء إضافة الرد');
+      const errorMessage = error?.message || 'حدث خطأ أثناء إضافة الرد. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

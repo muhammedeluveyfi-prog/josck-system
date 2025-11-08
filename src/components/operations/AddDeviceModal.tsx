@@ -81,9 +81,10 @@ export default function AddDeviceModal({ onClose, onSuccess }: AddDeviceModalPro
     try {
       await storage.addDevice(newDevice);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding device:', error);
-      alert('حدث خطأ أثناء إضافة الجهاز');
+      const errorMessage = error?.message || 'حدث خطأ أثناء إضافة الجهاز. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

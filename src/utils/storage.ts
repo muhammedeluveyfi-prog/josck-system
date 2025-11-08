@@ -52,9 +52,10 @@ export const storage = {
       const devices = await apiService.getDevices();
       devicesCache = devices;
       return devices;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting devices:', error);
-      return [];
+      // Throw error instead of returning empty array so callers can handle it
+      throw error;
     }
   },
 
@@ -87,9 +88,13 @@ export const storage = {
           devicesCache = await apiService.getDevices();
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding device:', error);
-      throw error;
+      // Re-throw with user-friendly message if needed
+      if (error?.message) {
+        throw error;
+      }
+      throw new Error('حدث خطأ أثناء إضافة الجهاز. يرجى المحاولة مرة أخرى.');
     }
   },
 
@@ -107,9 +112,13 @@ export const storage = {
           devicesCache = await apiService.getDevices();
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating device:', error);
-      throw error;
+      // Re-throw with user-friendly message if needed
+      if (error?.message) {
+        throw error;
+      }
+      throw new Error('حدث خطأ أثناء تحديث الجهاز. يرجى المحاولة مرة أخرى.');
     }
   },
 
@@ -131,9 +140,13 @@ export const storage = {
           devicesCache = await apiService.getDevices();
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding report:', error);
-      throw error;
+      // Re-throw with user-friendly message if needed
+      if (error?.message) {
+        throw error;
+      }
+      throw new Error('حدث خطأ أثناء إضافة التقرير. يرجى المحاولة مرة أخرى.');
     }
   },
 
@@ -150,9 +163,13 @@ export const storage = {
         return true;
       }
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting device:', error);
-      throw error;
+      // Re-throw with user-friendly message if needed
+      if (error?.message) {
+        throw error;
+      }
+      throw new Error('حدث خطأ أثناء حذف الجهاز. يرجى المحاولة مرة أخرى.');
     }
   },
 

@@ -42,9 +42,10 @@ export default function TransferBackModal({ device, technician, onClose, onSucce
       });
 
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error transferring device back:', error);
-      alert('حدث خطأ أثناء تحويل الجهاز');
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحويل الجهاز. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

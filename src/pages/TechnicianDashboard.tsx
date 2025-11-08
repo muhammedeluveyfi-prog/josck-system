@@ -29,8 +29,11 @@ export default function TechnicianDashboard({ user, onLogout }: TechnicianDashbo
     try {
       const allDevices = await storage.getDevices();
       setDevices(allDevices);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading devices:', error);
+      // Show user-friendly error message
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحميل الأجهزة. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

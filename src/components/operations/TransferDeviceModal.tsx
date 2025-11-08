@@ -20,8 +20,10 @@ export default function TransferDeviceModal({ device, onClose, onSuccess }: Tran
       try {
         const allUsers = await storage.getUsers();
         setTechnicians(allUsers.filter(u => u.role === 'technician'));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading technicians:', error);
+        // Show error but don't block the modal
+        alert('حدث خطأ أثناء تحميل قائمة الفنيين. يرجى المحاولة مرة أخرى.');
       }
     };
     loadTechnicians();
@@ -48,9 +50,10 @@ export default function TransferDeviceModal({ device, onClose, onSuccess }: Tran
       }
 
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error transferring device:', error);
-      alert('حدث خطأ أثناء تحويل الجهاز');
+      const errorMessage = error?.message || 'حدث خطأ أثناء تحويل الجهاز. يرجى المحاولة مرة أخرى.';
+      alert(errorMessage);
     }
   };
 

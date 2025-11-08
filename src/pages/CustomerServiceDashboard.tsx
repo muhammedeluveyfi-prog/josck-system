@@ -42,9 +42,10 @@ export default function CustomerServiceDashboard({ user, onLogout }: CustomerSer
       } else {
         setError('لم يتم العثور على الجهاز');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching for device:', error);
-      setError('حدث خطأ أثناء البحث');
+      const errorMessage = error?.message || 'حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.';
+      setError(errorMessage);
     }
   };
 
