@@ -244,3 +244,4 @@ export async function addReportToDevice(deviceId, report) {
   return devices[index];
 }
 
+

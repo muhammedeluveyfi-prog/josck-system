@@ -149,6 +149,90 @@ const docToDevice = (docData) => {
 
 // ============ AUTH ENDPOINTS ============
 
+// Initialize database (public endpoint for first-time setup)
+// This endpoint creates collections and default data
+app.post('/api/init', async (req, res) => {
+  try {
+    const results = {
+      users: { created: 0, exists: false },
+      devices: { created: 0, exists: false },
+      collections: []
+    };
+
+    // Check and initialize Users collection
+    try {
+      const usersRef = collection(db, COLLECTIONS.USERS);
+      const usersSnapshot = await getDocs(usersRef);
+      
+      if (usersSnapshot.empty) {
+        const defaultUsers = await initializeDefaultUsers();
+        results.users.created = defaultUsers.length;
+        results.collections.push('users');
+      } else {
+        results.users.exists = true;
+        results.users.created = usersSnapshot.size;
+      }
+    } catch (error) {
+      console.error('Error initializing users collection:', error);
+      return res.status(500).json({ 
+        error: 'Failed to initialize users collection',
+        details: error.message 
+      });
+    }
+
+    // Check and initialize Devices collection (create empty if needed)
+    try {
+      const devicesRef = collection(db, COLLECTIONS.DEVICES);
+      const devicesSnapshot = await getDocs(devicesRef);
+      
+      if (devicesSnapshot.empty) {
+        // Create an empty document to initialize the collection
+        await addDoc(devicesRef, {
+          _init: true,
+          createdAt: Timestamp.now(),
+        });
+        // Delete the init document
+        const initSnapshot = await getDocs(query(devicesRef, where('_init', '==', true)));
+        if (!initSnapshot.empty) {
+          await deleteDoc(doc(db, COLLECTIONS.DEVICES, initSnapshot.docs[0].id));
+        }
+        results.devices.created = 0;
+        results.collections.push('devices');
+      } else {
+        results.devices.exists = true;
+        results.devices.created = devicesSnapshot.size;
+      }
+    } catch (error) {
+      console.error('Error initializing devices collection:', error);
+      // Don't fail if devices collection fails
+    }
+
+    res.json({
+      success: true,
+      message: 'Database initialized successfully',
+      results: results,
+      collections: results.collections.length > 0 
+        ? `Created collections: ${results.collections.join(', ')}`
+        : 'All collections already exist'
+    });
+  } catch (error) {
+    console.error('Error initializing database:', error);
+    
+    // Check if it's a Firebase permission error
+    if (error.code === 7 || error.message?.includes('PERMISSION_DENIED') || error.message?.includes('Firestore API')) {
+      return res.status(503).json({ 
+        error: 'Firebase Firestore API غير مفعّل. يرجى تفعيل Cloud Firestore API من Google Cloud Console.',
+        details: error.message 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to initialize database',
+      details: error.message || 'Unknown error'
+    });
+  }
+});
+
 // Initialize default users (public endpoint for first-time setup)
 app.post('/api/auth/init', async (req, res) => {
   try {
@@ -668,5 +752,8 @@ app.listen(PORT, () => {
   console.log(`\n📝 Default Admin Account:`);
   console.log(`   Username: admin`);
   console.log(`   Password: admin123`);
+  console.log(`\n🔧 Initialize Database (Firebase Collections):`);
+  console.log(`   POST http://localhost:${PORT}/api/init`);
+  console.log(`   This will create 'users' and 'devices' collections automatically`);
 });
 
