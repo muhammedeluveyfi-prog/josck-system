@@ -14,8 +14,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+// CORS configuration - allows all origins in production
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? ['*'] // Allow all origins in production (you can specify your frontend domain later)
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'];
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+  origin: allowedOrigins.includes('*') ? true : allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

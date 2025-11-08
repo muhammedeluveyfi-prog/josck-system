@@ -5,12 +5,12 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server-local.js",
-    "dev": "node --watch server-local.js",
-    "start:firebase": "node server.js",
-    "dev:firebase": "node --watch server.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
     "start:local": "node server-local.js",
-    "dev:local": "node --watch server-local.js"
+    "dev:local": "node --watch server-local.js",
+    "start:firebase": "node server.js",
+    "dev:firebase": "node --watch server.js"
   },
   "keywords": [
     "josck",
