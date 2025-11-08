@@ -4,8 +4,8 @@ import { Device, User, TechnicianStats } from '../types';
 import { storage } from '../utils/storage';
 import { format } from 'date-fns';
 import {
-  Plus, CheckCircle, User as UserIcon,
-  Search, Edit, Eye, Send, FileText, Trash2, ClipboardCheck
+  Plus, CheckCircle,
+  Search, Edit, Eye, Send, Trash2, ClipboardCheck
 } from 'lucide-react';
 import AddDeviceModal from '../components/operations/AddDeviceModal';
 import EditDeviceModal from '../components/operations/EditDeviceModal';

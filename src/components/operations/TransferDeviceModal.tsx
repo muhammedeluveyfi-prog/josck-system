@@ -14,17 +14,14 @@ export default function TransferDeviceModal({ device, onClose, onSuccess }: Tran
   const [needsApproval, setNeedsApproval] = useState(false);
   const [approvalReason, setApprovalReason] = useState('');
   const [technicians, setTechnicians] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadTechnicians = async () => {
       try {
         const allUsers = await storage.getUsers();
         setTechnicians(allUsers.filter(u => u.role === 'technician'));
-        setLoading(false);
       } catch (error) {
         console.error('Error loading technicians:', error);
-        setLoading(false);
       }
     };
     loadTechnicians();

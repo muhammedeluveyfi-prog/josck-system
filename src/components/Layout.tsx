@@ -118,8 +118,8 @@ export default function Layout({ title, user, onLogout, children, showNotificati
     };
   }, [showExpiredDetails, showOtherDevices]);
 
-  const activeNotifications = notifications.filter(n => !n.timeRemaining.isExpired);
-  const expiredNotifications = notifications.filter(n => n.timeRemaining.isExpired && !hiddenExpiredDevices.has(n.device.id));
+  const activeNotifications = notifications.filter(n => n.timeRemaining && !n.timeRemaining.isExpired);
+  const expiredNotifications = notifications.filter(n => n.timeRemaining && n.timeRemaining.isExpired && !hiddenExpiredDevices.has(n.device.id));
   
   // حساب الوقت المتبقي الحالي للجهاز الأول (للعرض الحي) - يتم تحديثه كل ثانية
   const firstActiveNotification = activeNotifications[0];
