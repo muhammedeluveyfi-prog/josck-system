@@ -33,6 +33,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
   const loadData = async () => {
     try {
+      // Clear cache to force fresh data from server
+      storage.clearCache();
       const [allUsers, allDevices] = await Promise.all([
         storage.getUsers(),
         storage.getDevices(),
@@ -41,9 +43,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       setDevices(allDevices);
     } catch (error: any) {
       console.error('Error loading data:', error);
-      // Show user-friendly error message
-      const errorMessage = error?.message || 'حدث خطأ أثناء تحميل البيانات. يرجى المحاولة مرة أخرى.';
-      alert(errorMessage);
+      // Don't show alert on auto-refresh to avoid annoying users
+      // Only log the error
     }
   };
 

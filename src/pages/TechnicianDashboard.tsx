@@ -35,13 +35,14 @@ export default function TechnicianDashboard({ user, onLogout }: TechnicianDashbo
 
   const loadDevices = async () => {
     try {
+      // Clear cache to force fresh data from server
+      storage.clearCache();
       const allDevices = await storage.getDevices();
       setDevices(allDevices);
     } catch (error: any) {
       console.error('Error loading devices:', error);
-      // Show user-friendly error message
-      const errorMessage = error?.message || 'حدث خطأ أثناء تحميل الأجهزة. يرجى المحاولة مرة أخرى.';
-      alert(errorMessage);
+      // Don't show alert on auto-refresh to avoid annoying users
+      // Only log the error
     }
   };
 

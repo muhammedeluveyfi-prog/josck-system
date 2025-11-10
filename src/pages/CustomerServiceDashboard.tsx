@@ -24,6 +24,8 @@ export default function CustomerServiceDashboard({ user, onLogout }: CustomerSer
 
     const updateDevice = async () => {
       try {
+        // Clear cache to force fresh data from server
+        storage.clearCache();
         const devices = await storage.getDevices();
         let foundDevice: Device | undefined;
 
