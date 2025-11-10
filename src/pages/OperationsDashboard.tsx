@@ -12,6 +12,7 @@ import EditDeviceModal from '../components/operations/EditDeviceModal';
 import DeviceDetailsModal from '../components/operations/DeviceDetailsModal';
 import TransferDeviceModal from '../components/operations/TransferDeviceModal';
 import CompleteDeviceModal from '../components/operations/CompleteDeviceModal';
+import ApproveDeviceModal from '../components/operations/ApproveDeviceModal';
 
 interface OperationsDashboardProps {
   user: User;
@@ -25,6 +26,7 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -160,34 +162,9 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
     }
   };
 
-  const handleApproveDevice = async (device: Device) => {
-    if (!confirm('هل أنت متأكد من الموافقة على هذا الجهاز؟')) {
-      return;
-    }
-
-    try {
-      await storage.updateDevice(device.id, {
-        status: 'completed',
-        location: 'customer',
-        updatedAt: new Date().toISOString(),
-      });
-      
-      // Reload devices to get updated data
-      await loadDevices();
-      
-      // Scroll to completed devices section
-      setTimeout(() => {
-        const element = document.getElementById('completed-devices');
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
-      
-      alert('تمت الموافقة على الجهاز بنجاح وتم نقله إلى قسم المكتملة');
-    } catch (error) {
-      console.error('Error approving device:', error);
-      alert('حدث خطأ أثناء الموافقة على الجهاز');
-    }
+  const handleApproveDevice = (device: Device) => {
+    setSelectedDevice(device);
+    setShowApproveModal(true);
   };
 
   const inRepairDevices = devices.filter(d => d.status === 'in_repair' || d.status === 'transferred');
@@ -1066,6 +1043,22 @@ export default function OperationsDashboard({ user, onLogout }: OperationsDashbo
           }}
           onSuccess={() => {
             setShowCompleteModal(false);
+            setSelectedDevice(null);
+            loadDevices();
+          }}
+        />
+      )}
+
+      {showApproveModal && selectedDevice && (
+        <ApproveDeviceModal
+          device={selectedDevice}
+          user={user}
+          onClose={() => {
+            setShowApproveModal(false);
+            setSelectedDevice(null);
+          }}
+          onSuccess={() => {
+            setShowApproveModal(false);
             setSelectedDevice(null);
             loadDevices();
           }}
