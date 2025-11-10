@@ -21,6 +21,14 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
   useEffect(() => {
     loadData();
+    
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(() => {
+      loadData();
+    }, 5000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {

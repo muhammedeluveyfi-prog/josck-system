@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { Device, User } from '../types';
 import { storage } from '../utils/storage';
@@ -17,6 +17,33 @@ export default function CustomerServiceDashboard({ user, onLogout }: CustomerSer
   const [device, setDevice] = useState<Device | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [error, setError] = useState('');
+
+  // Auto-refresh device data every 5 seconds if a device is displayed
+  useEffect(() => {
+    if (!device) return;
+
+    const updateDevice = async () => {
+      try {
+        const devices = await storage.getDevices();
+        let foundDevice: Device | undefined;
+
+        if (searchType === 'order') {
+          foundDevice = devices.find(d => d.orderNumber === device.orderNumber);
+        } else {
+          foundDevice = devices.find(d => d.phoneNumber === device.phoneNumber);
+        }
+
+        if (foundDevice) {
+          setDevice(foundDevice);
+        }
+      } catch (error) {
+        console.error('Error updating device:', error);
+      }
+    };
+
+    const interval = setInterval(updateDevice, 5000);
+    return () => clearInterval(interval);
+  }, [device, searchType]);
 
   const handleSearch = async () => {
     setError('');

@@ -23,6 +23,14 @@ export default function TechnicianDashboard({ user, onLogout }: TechnicianDashbo
 
   useEffect(() => {
     loadDevices();
+    
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(() => {
+      loadDevices();
+    }, 5000);
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, []);
 
   const loadDevices = async () => {
